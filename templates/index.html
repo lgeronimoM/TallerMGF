@@ -1,0 +1,301 @@
+{% extends 'base/base.html' %}
+
+{% block content %}
+    <header>
+        <nav class="grey lighten-3">
+            <div class="nav-wrapper container">
+                <a href="https://www.facebook.com/Taller-Mec%C3%A1nico-Automotriz-MGF-233322433704882/" class="brand-logo black-text"><img src="{{url_for('static', filename='img/facebook.png')}}"/></a>
+                <ul class="right hide-on-med-and-down">
+                    <li><a href="#descripcion" class="black-text">Descripción</a></li>
+                    <li><a href="#servicios" class="black-text">Servicios</a></li>
+                    <li><a href="#facilidades" class="black-text">Facilidades</a></li>
+                    <li><a href="#ubicacion" class="black-text">Ubicación</a></li>
+                    <li><a href="#contacto" class="black-text">Contacto</a></li>
+                    <a class="btn-floating pulse btn-large waves-effect waves-light 00bfa5 teal accent-4 modal-trigger" href="#modal1"><i class="material-icons">event</i></a>
+                </ul>
+            </div>
+        </nav>
+         <!-- Modal Structure -->
+        <div id="modal1" class="modal">
+            <div class="modal-content">
+                <h5 class="center">Aquí puedes agendar una cita.</h5>
+                <div class="row">
+                    <form class="col s12" action="/agenda" method="POST">
+                        <div class="col s6">
+                            <input type="text" name="hour" class="timepicker" id="icon_prefix" required>
+                            <label for="icon_prefix">Elija el horario de su preferencia 9:00AM a 6:00PM Lunes a Viernes y 9:00AM a 4:00PM Sabados.</label>
+                        </div>
+                        <div class="col s6">
+                            <input type="text" name="day" class="datepicker" id="icon_prefix" required>
+                            <label for="icon_prefix">Elija el dia de su preferencia de Lunes a viernes atención a clientes por cita.</label>
+                        </div>
+                        
+                        <div class="input-field col s12">
+                            <i class="material-icons prefix">account_circle</i>
+                            <input id="icon_prefix" type="text" name="username" class="validate" required>
+                            <label for="icon_prefix">Nombre</label>
+                            <span class="helper-text" data-error="error" data-success="valido">Digite un nombre valido</span>
+                        </div>
+                        <div class="input-field col s6">
+                            <i class="material-icons prefix">phone</i>
+                            <input id="icon_telephone" type="tel" name="telefono" class="validate" pattern="[0-9]{10}" required>
+                            <label for="phone">Celular</label>
+                            <span class="helper-text" data-error="error" data-success="valido">Digite un numero valido</span>
+                        </div>
+                        <div class="input-field col s6">
+                            <i class="material-icons prefix">mail_outline</i>
+                            <input id="email" type="email" name="email" class="validate" required>
+                            <label for="email">Correo</label>
+                            <span class="helper-text" data-error="error" data-success="valido">Digite un correo valido</span>
+                        </div>
+                        <div class="input-field col s12">
+                            <textarea id="textarea1" name="descripcion" class="materialize-textarea" required></textarea>
+                            <label for="textarea1">Para brindarte un servicio más rapido cuentanos la razon de tu visita.</label>
+                        </div>
+                        <div class="input-field col s12">
+                            <button class="waves-effect waves-light btn center" type="submit" name="action">Enviar<i class="material-icons left">send</i>
+                        </div>
+                    </form>
+                </div>
+                <h5>Recomendaciones previas a la cita.</h5>
+                <P ALIGN="justify">Aqui puedes agendar una cita con uno nuestros tecnico automotrices certificados,  le recordamos que es convieniente que se encuntre 10 minutos 
+                antes en nuestra instalaciones para evitar algun problema con la atención y preferencia que se le otorga con esta agenda, esto con la finalidad de respetar a nuestro 
+                clientes ya que para nosotros es muy importante brindarle la mejor atención posible y profesional. </p>
+            </div>
+        </div>
+        <div class="container row">
+            <div class="col s6">
+                <img src="{{url_for('static', filename='img/logo.jpg')}}" style="width: 20vh; margin-top: 20px;" />
+                <h5>Taller Mécanico Automotriz MGF</h5>
+            </div>
+            <div class="col s6" style="margin-top: 20px;">
+                <h5> <i class="material-icons Small">call</i> Llámanos al +52 <b>453 515 5272 </b><img src="{{url_for('static', filename='img/whatsapp.png')}}" style="width: 5vh;" /></h5> 
+                <a href="#contacto" class="waves-effect pulse waves-light btn 00bfa5 teal accent-4"><i class="material-icons left">mail_outline</i>Enviar Mensaje</a>
+            </div>
+        </div>
+        <div class="parallax-container">
+            <div class="parallax"><img src="static/img/portada.jpg" alt="" style="width: 40vh; margin-top: 20px;"></div>
+        </div>
+    </header>
+    <main>
+        <div class="container row">
+            <div class="col s12">
+                <h2 class="center" name="descripcion" id="descripcion">Descripción</h2>
+            </div>
+            <div class="col s12" style="margin-top: 20px;">
+                <P ALIGN="justify" class="flow-text">Empresa 100% Mexicana que está respaldada por más de 24 años de experiencia en el ramo de la mecánica general automotríz y sistema 
+                eléctrico automotriz, garantizamos un buen servicio a su auto, con un trato amable y un amplio horario de atención, los 365 días del año. Caracterizando 
+                nuestra voluntad de servir a los Clientes que nos favorecen con su visita y confianza. </p>
+                <p ALIGN="justify" class="flow-text">La experiencia, profesionalismo y preparación de nuestros técnicos es lo que nos a llevado hacer una empresa de exito, y así como tambien 
+                nuestro compromiso por ofrecer el mejor servicio de calidad, trato personalizado, honradez y rapidez, el cual nos ha permitido seguir contando con la preferencia 
+                de nuestros clientes. </p>
+            </div>
+            <div class="col s12">
+                <h2 class="center" name="servicios" id="servicios">Servicios</h2>
+            </div>
+            <div class="col s12" style="margin-top: 20px;">
+                <P ALIGN="justify" class="flow-text">Nuestro taller mecánico automotriz MGF, le ofrece los siguientes servicios de mantenimiento y correctivos:</p>   
+                <ul class="collapsible">
+                    <li>
+                        <div class="collapsible-header flow-text"><i class="material-icons">check</i>Afinación.</div>
+                        <div class="collapsible-body flow-text"><span>Alarga la vida del motor, mejora el rendimiento por consumo de gasolina, provee al motor de suavidad y potencia, 
+                        reduce las emisiones de gases contaminantes. Recomendamos este servicio cada 6 meses o 10,000 km.</span></div>
+                    </li>
+                    <li>
+                        <div class="collapsible-header flow-text"><i class="material-icons">check</i>Frenos.</div>
+                        <div class="collapsible-body flow-text"><span ALIGN="justify">Detecta y corrige fallas en el sistema de frenos, lo cual evita el riesgo de accidentes. Elimina ruidos al frenar y 
+                        comportamientos extraños del vehículo. Permite controlar el vehículo en diversas condiciones de manejo. Recomendamos 
+                        este servicio cada 6 meses o 10,000 km.</span></div>
+                    </li>
+                    <li>
+                        <div class="collapsible-header flow-text"><i class="material-icons">check</i>Cambio de Aceite.</div>
+                        <div class="collapsible-body flow-text"><span>Prolonga la vida del motor al retardar el espesamiento del aceite, asegura una máxima protección lubricante, 
+                        neutraliza los ácidos dañinos y controla la formación de óxido. Recomendamos para una máxima protección de su motor un 
+                        cambio de aceite cada 15,000 km.</span></div>
+                    </li>
+                    <li>
+                        <div class="collapsible-header flow-text"><i class="material-icons">check</i>Transmisión.</div>
+                        <div class="collapsible-body flow-text"><span>Con este servicio aumentará la vida en la transmisión de su vehículo, reducirá el desgaste prematuro de todas las 
+                        partes de la transmisión, y así evitará daños graves y reparaciones costosas de su vehículo. Recomendamos este servicio 
+                        una vez al año o cada 20,000 km</span></div>
+                    </li>
+                    <li>
+                        <div class="collapsible-header flow-text"><i class="material-icons">check</i>Motor.</div>
+                        <div class="collapsible-body flow-text"><span>Su motor es el componente más complejo de su automóvil, que requiere de un programa de mantenimiento para garantizar 
+                        que funcione de excelente forma. Mantenga su motor en perfecto estado.</span></div>
+                    </li>
+                    <li>
+                        <div class="collapsible-header flow-text"><i class="material-icons">check</i>Batería.</div>
+                        <div class="collapsible-body flow-text"><span>La batería ayuda al vehículo a encender y seguir en movimiento. La energía eléctrica necesaria para que el vehículo 
+                        funcione se encuentra almacenada en la batería. Se debe realizar un mantenimiento regular para asegurarnos que la batería 
+                        funcione correctamente.</span></div>
+                    </li>
+                    <li>
+                        <div class="collapsible-header flow-text"><i class="material-icons">check</i>Encendido.</div>
+                        <div class="collapsible-body flow-text"><span>El sistema de encendido en los vehículos a gasolina es e encargado de hacer saltar una chispa eléctrica en el interior 
+                        de los cilindros, esto para provocar la combustión de la mezcla aire-gasolina. Si el vehículo no arranca, el motor no se 
+                        enciende o el vehículo acelera mal, puede tratarse de un fallo de la bobina de encendido.</span></div>
+                    </li>
+                    <li>
+                        <div class="collapsible-header flow-text"><i class="material-icons">check</i>Suspensión.</div>
+                        <div class="collapsible-body flow-text"><span>Su principal función es proporcionar estabilidad y confort al conjunto del vehículo. El sistema de suspensión es capaz 
+                        de absorber las irregularidades del terreno por el que circulamos para evitar que afecten al interior del vehículo. Con 
+                        este servicio detectamos anticipadamente fallas y desgastes en la dirección y en la suspensión.</span></div>
+                    </li>
+                    <li>
+                        <div class="collapsible-header flow-text"><i class="material-icons">check</i>Sistema electrico general.</div>
+                        <div class="collapsible-body flow-text"><span>Correccion y mantenimiento preventivo del sistema electrico automotriz.</span></div>
+                    </li>
+                </ul>
+            </div>
+            <div class="col s12">
+                <h2 class="center" name="facilidades" id="facilidades">Facilidades</h2>
+            </div>
+            <div class="col s12">
+                 <div class="slider">
+                    <ul class="slides">
+                    <li>
+                        <img src="{{url_for('static', filename='img/consulta.jpg')}}" style="width: 140vh;" />
+                        <div class="caption center-align">
+                        <h3>Consulta sin compromiso.</h3>
+                        <h5 class="light grey-text text-lighten-3">Te ayudamos a darte un diagnostico sin comportamientos.</h5>
+                        </div>
+                    </li>
+                    <li>
+                        <img src="{{url_for('static', filename='img/cotizacion.jpg')}}" style="width: 140vh;" />
+                        <div class="caption left-align">
+                        <h3>Contización.</h3>
+                        <h5 class="light grey-text text-lighten-3">Realizamos una cotización sin compromiso.</h5>
+                        </div>
+                    </li>
+                    <li>
+                        <img src="{{url_for('static', filename='img/diagnostico.jpg')}}" style="width: 140vh;" />
+                        <div class="caption right-align">
+                        <h3>Visitas a domicilio</h3>
+                        <h5 class="light grey-text text-lighten-3">Realizamos visitas a domicilio cuando el cliente lo requiere con una disponibilidad mas amplia dentro de la zona de Apatzingan.</h5>
+                        </div>
+                    </li>
+                    <li>
+                        <img src="{{url_for('static', filename='img/garantia.jpg')}}" style="width: 140vh;" />
+                        <div class="caption center-align">
+                        <h3>Garantia de nuestro servicio</h3>
+                        <h5 class="light grey-text text-lighten-3">Todos los servicios realizados tienen garantia.</h5>
+                        </div>
+                    </li>
+                    </ul>
+                </div>
+            </div>
+            <div class="col s12">
+                <h2 class="center" name="contacto" id="contacto">Contacto</h2>
+            </div>
+            <div class="container">
+                <form class="col s12" action="/mensaje" method="POST">
+                    <div class="row">
+                       <div class="input-field col s12">
+                            <i class="material-icons prefix">account_circle</i>
+                            <input id="icon_prefix" type="text" name="username" class="validate" required>
+                            <label for="icon_prefix">Nombre</label>
+                            <span class="helper-text" data-error="error" data-success="valido">Digite un nombre valido</span>
+                        </div>
+                        <div class="input-field col s6">
+                            <i class="material-icons prefix">phone</i>
+                            <input id="icon_telephone" type="tel" name="telefono" class="validate" pattern="[0-9]{10}" required>
+                            <label for="phone">Celular</label>
+                            <span class="helper-text" data-error="error" data-success="valido">Digite un numero valido</span>
+                        </div>
+                        <div class="input-field col s6">
+                            <i class="material-icons prefix">mail_outline</i>
+                            <input id="email" type="email" class="validate" name="email" required>
+                            <label for="email">Correo</label>
+                            <span class="helper-text" data-error="error" data-success="valido">Digite un correo valido</span>
+                        </div>
+                        <div class="input-field col s12">
+                            <textarea id="textarea1" class="materialize-textarea" name="descripcion" required></textarea>
+                            <label for="textarea1">Cuentanos como podemos ayudarte.</label>
+                        </div>
+                        <div class="input-field col s12">
+                            <button class="waves-effect waves-light btn center" type="submit" name="action">Enviar<i class="material-icons left">send</i>
+                        </div>
+                    </div>
+                </form>    
+            </div>
+        </div>
+    </main>
+    <footer class="page-footer grey lighten-3">
+          <div class="container">
+            <div class="row">
+              <div class="col l6 s12">
+                <h5 class="black-text" name="ubicacion" id="ubicacion">Ubicación</h5>
+                <a class="" href="https://maps.google.com/?q=Jos%C3%A9%20Sotero%20De%20Casta%C3%B1eda%20%23%20601%2C%2C%20Apatzing%C3%A1n%20de%20la%20Constituci%C3%B3n%2C%20Michoac%C3%A1n%2C%2060600">
+                    <i class="material-icons left">location_on</i>
+                    <p class="black-text text-lighten-4">José Sotero De Castañeda # 601
+                    Apatzingán de la Constitución, Michoacán C.P. 60600.</p></a>
+                    <p  class="black-text"><i class="material-icons Small">call</i> Llámanos al +52 <b>453 515 5272</b></p>
+              </div>
+              <div class="col l4 offset-l2 s12">
+                <h5 class="black-text">Visitanos</h5>
+                <ul>
+                  <li><a class="black-text text-lighten-3" href="https://www.facebook.com/Taller-Mec%C3%A1nico-Automotriz-MGF-233322433704882/">facebook #tallermecanicoautomotrizMGF</a></li>
+                </ul>
+              </div>
+            </div>
+          </div>
+          <div class="footer-copyright">
+            <div class="container">
+            © 2014 Copyright Text
+            <a class="black-text text-lighten-4 right" href="#!">Tecnicos profecionales certificados GM.</a>
+            </div>
+          </div>
+        </footer>
+                
+    <!-- Compiled and minified JavaScript -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var elems = document.querySelectorAll('.parallax');
+            var instances = M.Parallax.init(elems);
+        });
+
+        document.addEventListener('DOMContentLoaded', function() {
+            var elems = document.querySelectorAll('.slider');
+            var instances = M.Slider.init(elems);
+        });
+
+        document.addEventListener('DOMContentLoaded', function() {
+            var elems = document.querySelectorAll('.modal');
+            var instances = M.Modal.init(elems);
+        });
+
+        document.addEventListener('DOMContentLoaded', function() {
+            var options = {    
+                showClearBtn: true,
+                twelveHour: true
+                };
+            var elems = document.querySelectorAll('.timepicker');
+            var instances = M.Timepicker.init(elems, options);
+            instances.setHours(9-20);
+        });
+
+        document.addEventListener('DOMContentLoaded', function() {
+            var options = {
+                firstDay: 1,  //no permite seleccionar los días pasados
+                selectMonths: true, // Creates a dropdown to control month
+                selectYears: 5, // Creates a dropdown of 5 years to control year
+                disableDayFn: function(date) {
+                    if(date.getDay() == 0) // getDay() returns a value from 0 to 6, 1 represents Monday
+                        return true;
+                    if(date.getDay() == 6)
+                         return true;
+                    else
+                        return false;
+                }
+            };
+            var elems = document.querySelectorAll('.datepicker');
+            var instances = M.Datepicker.init(elems, options);
+        });
+        document.addEventListener('DOMContentLoaded', function() {
+            var elems = document.querySelectorAll('.collapsible');
+            var instances = M.Collapsible.init(elems);
+        });
+    </script>
+{% endblock %}
