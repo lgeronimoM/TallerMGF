@@ -3,46 +3,62 @@ kind: Deployment
 metadata:
   name: tallermgf-api
   namespace: tallermgf
-  labels:
-    app: tallermgf-api
+  labels: { app: tallermgf-api }
 spec:
   replicas: 1
   selector:
-    matchLabels:
-      app: tallermgf-api
+    matchLabels: { app: tallermgf-api }
   template:
     metadata:
-      labels:
-        app: tallermgf-api
+      labels: { app: tallermgf-api }
     spec:
-      imagePullSecrets:
-        - name: ghcr-creds # creado más abajo si el repo es privado
+      volumes:
+        - name: workspace
+          emptyDir: {}
+      initContainers:
+        - name: git-clone
+          image: alpine/git:2.45.2
+          env:
+            # Si tu repo es PRIVADO, usa esta var y crea un Secret con un PAT o deploy key
+            - name: GIT_URL
+              value: "https://github.com/lgeronimoM/TallerMGF.git"
+          command: ["/bin/sh","-c"]
+          args:
+            - |
+              set -e
+              echo "Clonando código…"
+              git clone --depth=1 "$GIT_URL" /workspace
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace
       containers:
         - name: api
-          image: ghcr.io/OWNER/TallerMGF:latest
-          imagePullPolicy: Always
+          image: python:3.11-slim
+          workingDir: /workspace
+          command: ["/bin/sh","-c"]
+          args:
+            - |
+              set -e
+              pip install --no-cache-dir --upgrade pip
+              pip install --no-cache-dir -r requirements.txt gunicorn
+              # Ruta de salud opcional en Flask: /health
+              exec gunicorn main:app --bind 0.0.0.0:8000 --workers 2 --threads 4 --timeout 60
           ports:
             - containerPort: 8000
           env:
-            # Ejemplo de variables si usas properties.py/envs
             - name: FLASK_ENV
               value: "production"
           readinessProbe:
-            httpGet:
-              path: /
-              port: 8000
-            initialDelaySeconds: 5
+            httpGet: { path: "/", port: 8000 }
+            initialDelaySeconds: 10
             periodSeconds: 10
           livenessProbe:
-            httpGet:
-              path: /
-              port: 8000
-            initialDelaySeconds: 15
+            httpGet: { path: "/", port: 8000 }
+            initialDelaySeconds: 20
             periodSeconds: 20
           resources:
-            requests:
-              cpu: "100m"
-              memory: "128Mi"
-            limits:
-              cpu: "500m"
-              memory: "512Mi"
+            requests: { cpu: "100m", memory: "128Mi" }
+            limits:   { cpu: "500m", memory: "512Mi" }
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace

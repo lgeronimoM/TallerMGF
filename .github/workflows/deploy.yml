@@ -1,69 +1,58 @@
 name: build-and-deploy
+
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   workflow_dispatch: {}
+
+permissions:
+  contents: read
+  packages: write
 
 jobs:
   build-push:
-    name: Build & Push Image
     runs-on: self-hosted
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      
-      - name: Login to GHCR
-        if: ${{ secrets.GHCR_TOKEN != '' }}
-        run: echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ secrets.GHCR_USERNAME }}" --password-stdin
-      
-      - name: Build image
+      - uses: actions/checkout@v4
+      - name: Login GHCR
+        run: echo "${{ github.token }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+      - name: Build
         run: |
-          IMAGE="ghcr.io/OWNER/TallerMGF:${GITHUB_SHA}"
-          docker build -t "$IMAGE" .
-          docker tag "$IMAGE" ghcr.io/OWNER/TallerMGF:latest
-      
-      - name: Push image
+          IMAGE_SHA="ghcr.io/lgeronimoM/TallerMGF:${GITHUB_SHA}"
+          docker build -t "$IMAGE_SHA" .
+          docker tag "$IMAGE_SHA" ghcr.io/lgeronimoM/TallerMGF:latest
+      - name: Push
         run: |
-          docker push ghcr.io/OWNER/TallerMGF:${GITHUB_SHA}
-          docker push ghcr.io/OWNER/TallerMGF:latest
+          docker push ghcr.io/lgeronimoM/TallerMGF:${GITHUB_SHA}
+          docker push ghcr.io/lgeronimoM/TallerMGF:latest
 
   deploy:
-    name: Deploy to Kubernetes
     needs: build-push
     runs-on: self-hosted
     env:
       KUBECONFIG: ${{ github.workspace }}/kubeconfig
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      
-      # Si quieres inyectar un kubeconfig desde secret base64
-      - name: Write kubeconfig from secret
-        if: ${{ secrets.KUBE_CONFIG != '' }}
+      - uses: actions/checkout@v4
+      - name: Prepare kubeconfig
+        shell: bash
         run: |
-          echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > $KUBECONFIG
-      
-      - name: Ensure namespace
+          if [ -n "${{ secrets.KUBE_CONFIG }}" ]; then
+            echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > "$KUBECONFIG"
+          elif [ -f "$HOME/.kube/config" ]; then
+            cp "$HOME/.kube/config" "$KUBECONFIG"
+          else
+            echo "No kubeconfig provided and none found on runner." >&2
+            exit 1
+          fi
+      - name: Apply manifests
         run: |
           kubectl apply -f k8s/namespace.yaml
-      
-      - name: Update image tag in deployment
-        run: |
-          # parchea el deployment para usar la imagen de este commit
-          kubectl -n tallermgf set image deployment/tallermgf-api \
-            api=ghcr.io/OWNER/TallerMGF:${GITHUB_SHA} --record || true
-      
-      - name: Apply manifests (idempotent)
-        run: |
-          # primera vez aseguramos service y deployment
           kubectl apply -f k8s/deployment.yaml
           kubectl apply -f k8s/service.yaml
-          # kubectl apply -f k8s/ingress.yaml # si usas Ingress
-      
-      - name: Wait for rollout
+      - name: Rollout to this commit
         run: |
-          kubectl -n tallermgf rollout status deployment/tallermgf-api --timeout=120s
-      
+          kubectl -n tallermgf set image deployment/tallermgf-api \
+            api=ghcr.io/lgeronimoM/TallerMGF:${GITHUB_SHA} --record || true
+          kubectl -n tallermgf rollout status deployment/tallermgf-api --timeout=180s
       - name: Show service
-        run: |
-          kubectl -n tallermgf get svc tallermgf-svc -o wide
+        run: kubectl -n tallermgf get svc -o wide
