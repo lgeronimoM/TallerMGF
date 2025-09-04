@@ -46,7 +46,7 @@ def agendar():
     receiver_email = cf.REMAIL
     password = cf.EPASS
     subject = "Agenda cliente " + user
-    body = "El usario "+user+" con telefono "+telefono+" y su email "+email+"\nRelizo una cita el dia "+day+" en la hora "+hour+" por el siguiente problema: "+description
+    body = "El usuario "+user+" con telefono "+telefono+" y su email "+email+"\nRelizo una cita el dia "+day+" en la hora "+hour+" por el siguiente problema: "+description
     # Create a multipart message and set headers
     message = MIMEMultipart()
     message["From"] = sender_email
