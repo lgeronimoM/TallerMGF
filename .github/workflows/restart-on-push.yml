@@ -1,31 +1,21 @@
 name: restart-on-push
 on:
   push:
-    branches: ["master"]
+    branches: ["master"]   # o "main" si cambiaste de rama
   workflow_dispatch: {}
 
 jobs:
   restart:
     runs-on: self-hosted
     env:
-      KUBECONFIG: ${{ github.workspace }}/kubeconfig
+      KUBECONFIG: /home/github/.kube/config
     steps:
       - uses: actions/checkout@v4
-      - name: Prepare kubeconfig
-        shell: bash
-        run: |
-          if [ -n "${{ secrets.KUBE_CONFIG }}" ]; then
-            echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > "$KUBECONFIG"
-          elif [ -f "$HOME/.kube/config" ]; then
-            cp "$HOME/.kube/config" "$KUBECONFIG"
-          else
-            echo "No kubeconfig provided and none found on runner." >&2
-            exit 1
-          fi
+
       - name: Rollout restart
         run: |
           kubectl -n tallermgf rollout restart deployment/tallermgf-api
           kubectl -n tallermgf rollout status deployment/tallermgf-api --timeout=180s
+
       - name: Show service/ingress
-        run: |
-          kubectl -n tallermgf get deploy,po,svc,ing -o wide
+        run: kubectl -n tallermgf get deploy,po,svc,ing -o wide
