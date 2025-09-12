@@ -14,17 +14,15 @@ spec:
     app: flask-app
 
 ---
-# Opcional: Ingress para exponer externamente
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: flask-app-ingress
   annotations:
     kubernetes.io/ingress.class: "nginx"
-    # cert-manager.io/cluster-issuer: "letsencrypt-prod"  # Para HTTPS
 spec:
   rules:
-  - host: tu-dominio.com  # Cambia esto por tu dominio
+  - host: tu-dominio.com
     http:
       paths:
       - path: /
@@ -34,7 +32,3 @@ spec:
             name: flask-app-service
             port:
               number: 80
-  # tls:  # Descomenta para HTTPS
-  # - hosts:
-  #   - tu-dominio.com
-  #   secretName: flask-app-tls
