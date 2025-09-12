@@ -95,5 +95,14 @@ def mensaje():
         server.sendmail(sender_email, receiver_email, text)
     return redirect(url_for('index'))
 
+@app.route('/health')
+def health_check():
+    """Endpoint para health checks de Kubernetes"""
+    return {
+        'status': 'healthy',
+        'timestamp': datetime.utcnow().isoformat(),
+        'version': '1.0.0'
+    }, 200
+    
 if __name__ == '__main__':
     app.run(debug = cf.DEBUG, host=cf.SERVER, port = cf.PTO )
