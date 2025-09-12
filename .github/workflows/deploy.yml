@@ -69,6 +69,10 @@ jobs:
 
     - name: Deploy to Kubernetes
       run: |
+        # Verificar conectividad antes del despliegue
+        echo "Testing Kubernetes connectivity..."
+        kubectl get nodes || exit 1
+        
         # Crear manifiestos inline
         cat <<EOF > deployment.yml
         apiVersion: apps/v1
@@ -118,6 +122,10 @@ jobs:
           selector:
             app: flask-app
         EOF
+        
+        # Verificar el manifiesto antes de aplicar
+        echo "Validating manifest..."
+        kubectl apply --dry-run=client -f deployment.yml
         
         # Aplicar los manifiestos
         kubectl apply -f deployment.yml
