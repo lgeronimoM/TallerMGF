@@ -70,9 +70,15 @@ jobs:
       - name: Inject image into deployment
         run: |
           IMG="${{ env.REGISTRY }}/${{ steps.vars.outputs.image_name_lc }}:${{ steps.vars.outputs.image_tag }}"
-          sed -i "s|__IMAGE_PLACEHOLDER__|${IMG}|g" k8s/deployment.yaml
           echo "Using image: ${IMG}"
-          grep -n 'image:' k8s/deployment.yaml
+          echo "--- BEFORE replacement ---"
+          cat k8s/deployment.yaml
+          echo "--- Replacing placeholder ---"
+          sed -i "s|__IMAGE_PLACEHOLDER__|${IMG}|g" k8s/deployment.yaml
+          echo "--- AFTER replacement ---"
+          cat k8s/deployment.yaml
+          echo "--- Check if image was injected ---"
+          grep -n 'image:' k8s/deployment.yaml || echo "No image: line found!"
       - name: Apply manifests
         run: |
           kubectl apply -f k8s/deployment.yaml
