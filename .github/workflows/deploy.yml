@@ -1,4 +1,4 @@
-name: Deploy TallerMGF (GHCR público)
+name: Deploy TallerMGF (simple)
 
 on:
   push:
@@ -7,49 +7,38 @@ on:
 jobs:
   deploy:
     runs-on: self-hosted
+    env:
+      IMAGE: okteto/sample-app:latest   # ← cámbiala por TU imagen pública si quieres
 
     steps:
     - name: 📥 Checkout
       uses: actions/checkout@v4
 
-    - name: 🔍 Tools
+    - name: 🔍 Herramientas
       run: |
-        echo "🐳 Docker:" && docker --version
+        echo "🐳 Docker:" && docker --version || true
         echo "☸️ Kubectl (client):" && kubectl version --client=true
         echo "📦 Cluster:" && kubectl cluster-info
 
-    - name: 🔐 Login a GHCR (con GITHUB_TOKEN)
-      env:
-        CR_PAT: ${{ secrets.GITHUB_TOKEN }}
+    - name: 🚀 Deploy (apply manifests)
       run: |
-        echo "$CR_PAT" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-
-    - name: 🏗️ Build & Push a GHCR (tag = SHA)
-      env:
-        OWNER: ${{ github.repository_owner }}
-        IMAGE_SHA: ghcr.io/${{ github.repository_owner }}/tallermgf:${{ github.sha }}
-      run: |
-        docker build -t tallermgf:latest .
-        docker tag tallermgf:latest "$IMAGE_SHA"
-        docker push "$IMAGE_SHA"
-        echo "IMAGE_SHA=$IMAGE_SHA" >> $GITHUB_ENV
-        echo "OWNER=$OWNER" >> $GITHUB_ENV
-
-    - name: 🚀 Deploy a Kubernetes
-      run: |
+        # Namespace primero
         kubectl apply -f k8s/namespace.yaml
-        # Reemplaza SOLO la línea 'image:' por la imagen con SHA
-        sed -E 's|^(\s*image:\s*).*$|\1'"${IMAGE_SHA}"'|' k8s/deployment.yaml > /tmp/deployment-temp.yaml
-        kubectl apply -f /tmp/deployment-temp.yaml
+
+        # Reemplaza SOLO la línea 'image:' en el deployment con la imagen deseada
+        sed -E 's|^(\s*image:\s*).*$|\1'"${IMAGE}"'|' k8s/deployment.yaml > /tmp/deployment.yaml
+
+        # Aplica deployment, service, ingress
+        kubectl apply -f /tmp/deployment.yaml
         kubectl apply -f k8s/service.yaml
         kubectl apply -f k8s/ingress.yaml
 
     - name: ⏳ Esperar rollout
-      run: kubectl rollout status deployment/tallermgf -n tallermgf --timeout=300s
+      run: kubectl -n tallermgf rollout status deploy/tallermgf --timeout=300s
 
     - name: ✅ Verificación
       run: |
-        kubectl -n tallermgf get pods -o wide
+        kubectl -n tallermgf get deploy,pods,svc,ingress -o wide
         kubectl -n tallermgf get events --sort-by=.lastTimestamp | tail -50
 
     - name: 🧰 Diagnóstico si falla
@@ -57,4 +46,4 @@ jobs:
       run: |
         kubectl -n tallermgf describe deployment/tallermgf || true
         kubectl -n tallermgf describe pods || true
-        kubectl -n tallermgf get events --sort-by='.lastTimestamp' | tail -100 || true
+        kubectl -n tallermgf get events --sort-by='.lastTimestamp' | tail -150 || true

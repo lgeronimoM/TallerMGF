@@ -3,28 +3,22 @@ kind: Deployment
 metadata:
   name: tallermgf
   namespace: tallermgf
-  labels: { app: tallermgf }
 spec:
   replicas: 1
   selector:
-    matchLabels: { app: tallermgf }
+    matchLabels:
+      app: tallermgf
   template:
     metadata:
-      labels: { app: tallermgf }
+      labels:
+        app: tallermgf
     spec:
       containers:
       - name: tallermgf
-        # ⚠️ Esta línea la SOBREESCRIBE el workflow con el tag SHA de GHCR
-        image: ghcr.io/OWNER/tallermgf:latest
+        image: okteto/sample-app:latest   # 👈 imagen pública en Docker Hub
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 5000
-        env:
-        - name: FLASK_ENV
-          value: "production"
-        resources:
-          requests: { memory: "64Mi", cpu: "50m" }
-          limits:   { memory: "128Mi", cpu: "100m" }
         livenessProbe:
           httpGet: { path: /health, port: 5000 }
           initialDelaySeconds: 30
