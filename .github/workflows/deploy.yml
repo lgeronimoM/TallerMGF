@@ -44,7 +44,7 @@ jobs:
             ${{ env.REGISTRY }}/${{ steps.vars.outputs.image_name_lc }}:${{ steps.vars.outputs.image_tag }}
             ${{ env.REGISTRY }}/${{ steps.vars.outputs.image_name_lc }}:latest
 
-  deploy:
+   deploy:
     needs: build
     runs-on:
       - self-hosted
@@ -58,12 +58,15 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Compute image vars
-        id: vars
+      # ⚙️ Calcula la imagen SIEMPRE en minúsculas y con tag branch-SHA
+      - name: Compute image ref
+        id: img
         run: |
-          echo "image_name_lc=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
-          echo "image_tag=${GITHUB_REF_NAME}-${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
-          echo "image_ref=${{ env.REGISTRY }}/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]'):${GITHUB_REF_NAME}-${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          IMAGE_NAME_LC=$(echo "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]')
+          IMAGE_TAG="${GITHUB_REF_NAME}-${GITHUB_SHA}"
+          IMAGE_REF="${REGISTRY}/${IMAGE_NAME_LC}:${IMAGE_TAG}"
+          echo "ref=${IMAGE_REF}" >> "$GITHUB_OUTPUT"
+          echo "Using image: ${IMAGE_REF}"
 
       - name: Set up kubectl
         uses: azure/setup-kubectl@v4
@@ -79,38 +82,22 @@ jobs:
       - name: Ensure namespace
         run: kubectl apply -f k8s/namespace.yaml
 
-      # Opcional: si tu imagen es PRIVADA en GHCR, añade GHCR_USER/TOKEN/EMAIL en Secrets
-      - name: Ensure imagePullSecret (if private)
-        env:
-          GHCR_USER: ${{ secrets.GHCR_USER }}
-          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
-          GHCR_EMAIL: ${{ secrets.GHCR_EMAIL }}
-        run: |
-          if [ -n "$GHCR_USER" ] && [ -n "$GHCR_TOKEN" ] && [ -n "$GHCR_EMAIL" ]; then
-            kubectl -n tallermgf delete secret ghcr-creds --ignore-not-found
-            kubectl -n tallermgf create secret docker-registry ghcr-creds \
-              --docker-server=ghcr.io \
-              --docker-username="$GHCR_USER" \
-              --docker-password="$GHCR_TOKEN" \
-              --docker-email="$GHCR_EMAIL"
-            kubectl -n tallermgf patch deploy/tallermgf --type=merge -p \
-              '{"spec":{"template":{"spec":{"imagePullSecrets":[{"name":"ghcr-creds"}]}}}}' || true
-          else
-            echo "Skipping imagePullSecret (no GHCR_* secrets)."
-          fi
+      # 🔁 Asegura que el YAML base no quedó roto por un sed previo
+      - name: Restore base deployment (safety)
+        run: git checkout -- k8s/deployment.yaml
 
-      - name: Inject image into deployment
-        run: |
-          IMG="${{ steps.vars.outputs.image_ref }}"
-          sed -i "s|__IMAGE_PLACEHOLDER__|${IMG}|g" k8s/deployment.yaml
-          echo "Using image: ${IMG}"
-          grep -n 'image:' k8s/deployment.yaml
-
-      - name: Apply manifests
+      # 🧾 Aplica manifests base SIN tocar el YAML
+      - name: Apply manifests (base)
         run: |
           kubectl apply -f k8s/deployment.yaml
           kubectl apply -f k8s/service.yaml
           kubectl apply -f k8s/ingress.yaml
+
+      # 🖼️ Ahora sí, pone la imagen correcta al Deployment
+      - name: Set image to built tag
+        run: |
+          kubectl -n tallermgf set image deploy/tallermgf \
+            tallermgf=${{ steps.img.outputs.ref }}
 
       - name: Verify rollout
         run: |

@@ -2,7 +2,7 @@ __author__ = 'Luis Geronimo'
 class Config(object):
     #propiedades host
     SERVER='0.0.0.0'
-    PRTO = 8080
+    PRTO = 5000
 
     #propiedaeds Email
     PMAIL = 587  # For starttls
