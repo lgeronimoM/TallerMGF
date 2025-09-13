@@ -15,12 +15,10 @@ jobs:
     permissions:
       contents: read
       packages: write
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ⚙️ Obtener repo en minúsculas para GHCR
       - name: Compute image vars
         id: vars
         run: |
@@ -55,10 +53,9 @@ jobs:
   deploy:
     needs: [build]
     runs-on: [self-hosted, Linux, X64]
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    if: github.ref == 'refs/heads/master'
     env:
       REGISTRY: ghcr.io
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -88,11 +85,9 @@ jobs:
           IMG="${{ env.REGISTRY }}/${{ steps.vars.outputs.image_name_lc }}:${{ steps.vars.outputs.image_tag }}"
           sed -i "s|__IMAGE_PLACEHOLDER__|${IMG}|g" k8s/deployment.yaml
           echo "Using image: ${IMG}"
-          grep -n 'image:' k8s/deployment.yaml
 
       - name: Apply manifests
         run: |
-          set -euxo pipefail
           kubectl apply -f k8s/deployment.yaml
           kubectl apply -f k8s/service.yaml
           kubectl apply -f k8s/ingress.yaml
@@ -100,21 +95,4 @@ jobs:
       - name: Verify rollout
         run: |
           kubectl rollout status deployment/tallermgf -n tallermgf --timeout=300s
-          kubectl get all -n tallermgf
-
-      - name: Debug on failure
-        if: failure()
-        run: |
-          set +e
-          echo "---- DEPLOY ----"
-          kubectl get deploy tallermgf -n tallermgf -o yaml | egrep -A2 'name:|image:|strategy:' || true
-          echo "---- RS ----"
-          kubectl get rs -n tallermgf -o wide || true
-          echo "---- PODS ----"
-          kubectl get pods -n tallermgf -o wide || true
-          echo "---- EVENTS ----"
-          kubectl get events -n tallermgf --sort-by=.lastTimestamp | tail -n 100 || true
-          for p in $(kubectl get pods -n tallermgf -o name); do
-            echo "---- DESCRIBE $p ----"
-            kubectl describe -n tallermgf $p || true
-          done
+          kubectl get pods -n tallermgf

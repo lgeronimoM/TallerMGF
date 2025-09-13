@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
       - name: tallermgf
-        image: __IMAGE_PLACEHOLDER__
+        image: 
         ports:
         - containerPort: 5000
         env:
