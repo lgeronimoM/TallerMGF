@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: tallermgf
+  namespace: tallermgf   # 👈 añade esto
   labels:
     app: tallermgf
 spec:
@@ -23,21 +24,13 @@ spec:
         - name: FLASK_ENV
           value: "production"
         resources:
-          requests:
-            memory: "64Mi"
-            cpu: "50m"
-          limits:
-            memory: "128Mi"
-            cpu: "100m"
+          requests: { memory: "64Mi", cpu: "50m" }
+          limits:   { memory: "128Mi", cpu: "100m" }
         livenessProbe:
-          httpGet:
-            path: /health
-            port: 5000
+          httpGet: { path: /health, port: 5000 }
           initialDelaySeconds: 30
           periodSeconds: 10
         readinessProbe:
-          httpGet:
-            path: /health
-            port: 5000
+          httpGet: { path: /health, port: 5000 }
           initialDelaySeconds: 5
           periodSeconds: 5

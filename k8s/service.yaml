@@ -1,13 +1,15 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: tallermgf-svc
-  namespace: tallermgf
+  name: flask-app-service
+  namespace: tallermgf    # 👈 añade esto
+  labels:
+    app: tallermgf
 spec:
   selector:
-    app: tallermgf-api
-  ports:
-    - name: http
-      port: 80
-      targetPort: 8000
+    app: tallermgf
   type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: 5000
+    protocol: TCP

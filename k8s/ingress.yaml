@@ -2,7 +2,7 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: tallermgf-ingress
-  namespace: tallermgf
+  namespace: tallermgf    # 👈 añade esto
   annotations:
     nginx.ingress.kubernetes.io/ssl-redirect: "false"
 spec:
@@ -15,6 +15,6 @@ spec:
         pathType: Prefix
         backend:
           service:
-            name: tallermgf-svc
+            name: flask-app-service
             port:
               number: 80
