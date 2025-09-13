@@ -85,7 +85,7 @@ jobs:
       - name: Ensure namespace
         run: kubectl apply -f k8s/namespace.yaml
 
-      # (Opcional) Solo si tu imagen en GHCR es privada: configura GHCR_* en Secrets.
+      # (Opcional) Si tu imagen es PRIVADA en GHCR, define GHCR_USER/GHCR_TOKEN(read:packages)/GHCR_EMAIL en Secrets
       - name: Ensure imagePullSecret (if private)
         env:
           GHCR_USER: ${{ secrets.GHCR_USER }}
@@ -105,23 +105,49 @@ jobs:
             echo "Skipping imagePullSecret (no GHCR_* secrets)."
           fi
 
-      # Asegura que el YAML base no quedó modificado por intentos previos
-      - name: Restore base deployment (safety)
+      # Restaura el YAML del repo por si otro run lo dejó modificado
+      - name: Restore base deployment
         run: git checkout -- k8s/deployment.yaml
 
-      # Aplica manifests base SIN tocar el YAML
+      # Inyecta la imagen en el YAML (funciona si hay __IMAGE_PLACEHOLDER__, si image: está vacío o si falta image:)
+      - name: Inject image into deployment.yaml
+        shell: bash
+        run: |
+          set -euo pipefail
+          IMG="${{ steps.img.outputs.ref }}"
+
+          echo ">>> Antes:"
+          grep -n 'image:' -n k8s/deployment.yaml || true
+
+          if grep -q '__IMAGE_PLACEHOLDER__' k8s/deployment.yaml; then
+            sed -i "s|__IMAGE_PLACEHOLDER__|${IMG}|g" k8s/deployment.yaml
+          elif grep -Eq '^[[:space:]]*image:[[:space:]]*$' k8s/deployment.yaml; then
+            sed -i "s|^\([[:space:]]*image:\)[[:space:]]*$|\1 ${IMG}|" k8s/deployment.yaml
+          elif ! grep -Eq '^[[:space:]]*image:[[:space:]]' k8s/deployment.yaml; then
+            # Inserta la línea 'image: ...' después del contenedor 'tallermgf'
+            awk -v img="$IMG" '
+              $0 ~ /- name:[[:space:]]*tallermgf/ && !ins {
+                print
+                getline
+                if ($0 ~ /^[[:space:]]*image:/) { sub(/image:.*/, "image: " img); print; ins=1; next }
+                print "        image: " img
+                print
+                ins=1
+                next
+              }
+              {print}
+            ' k8s/deployment.yaml > k8s/deployment.patched.yaml && mv k8s/deployment.patched.yaml k8s/deployment.yaml
+          fi
+
+          echo ">>> Después:"
+          grep -n 'image:' -n k8s/deployment.yaml || (echo "ERROR: no se pudo establecer image:"; exit 1)
+
       - name: Apply manifests
         run: |
           set -euxo pipefail
           kubectl apply -f k8s/deployment.yaml
           kubectl apply -f k8s/service.yaml
           kubectl apply -f k8s/ingress.yaml
-
-      # Ahora ajusta la imagen efectiva en el objeto del clúster
-      - name: Set image to built tag
-        run: |
-          kubectl -n tallermgf set image deploy/tallermgf \
-            tallermgf=${{ steps.img.outputs.ref }}
 
       - name: Verify rollout
         run: |
@@ -131,7 +157,7 @@ jobs:
       - name: Debug on failure
         if: failure()
         run: |
-          kubectl get deploy tallermgf -n tallermgf -o yaml | egrep -A2 'name:|image:|strategy:' || true
+          kubectl get deploy tallermgf -n tallermgf -o yaml | egrep -A3 'name:|namespace:|image:|strategy:' || true
           kubectl get rs -n tallermgf -o wide || true
           kubectl get pods -n tallermgf -o wide || true
-          kubectl get events -n tallermgf --sort-by=.lastTimestamp | tail -n 120 || true
+          kubectl get events -n tallermgf --sort-by=.lastTimestamp | tail -n 150 || true
