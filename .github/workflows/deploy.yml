@@ -1,7 +1,12 @@
 name: Build and Deploy to Kubernetes
 
 on:
-  push: { branches: [ master ] }
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
 
 env:
   REGISTRY: ghcr.io
@@ -9,9 +14,13 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
-    permissions: { contents: read, packages: write }
+    permissions:
+      contents: read
+      packages: write
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
       - name: Compute image vars (lowercase + tag)
         id: vars
@@ -19,14 +28,14 @@ jobs:
           echo "image_name_lc=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
           echo "image_tag=${GITHUB_REF_NAME}-${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
 
-      - name: Login GHCR
+      - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build & push (only 2 tags: branch-SHA + latest)
+      - name: Build & push (branch-SHA + latest)
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -37,12 +46,17 @@ jobs:
 
   deploy:
     needs: build
-    runs-on: [self-hosted, Linux, X64]
-    if: github.ref == 'refs/heads/master'
+    runs-on:
+      - self-hosted
+      - Linux
+      - X64
+    if: ${{ github.ref == 'refs/heads/master' }}
     env:
       REGISTRY: ghcr.io
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
       - name: Compute image vars
         id: vars
@@ -51,10 +65,12 @@ jobs:
           echo "image_tag=${GITHUB_REF_NAME}-${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
           echo "image_ref=${{ env.REGISTRY }}/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]'):${GITHUB_REF_NAME}-${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
 
-      - uses: azure/setup-kubectl@v4
-        with: { version: 'v1.30.0' }
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: v1.30.0
 
-      - name: kubeconfig
+      - name: Configure kubeconfig
         run: |
           mkdir -p ~/.kube
           echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > ~/.kube/config
@@ -63,10 +79,31 @@ jobs:
       - name: Ensure namespace
         run: kubectl apply -f k8s/namespace.yaml
 
+      # Opcional: si tu imagen es PRIVADA en GHCR, añade GHCR_USER/TOKEN/EMAIL en Secrets
+      - name: Ensure imagePullSecret (if private)
+        env:
+          GHCR_USER: ${{ secrets.GHCR_USER }}
+          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+          GHCR_EMAIL: ${{ secrets.GHCR_EMAIL }}
+        run: |
+          if [ -n "$GHCR_USER" ] && [ -n "$GHCR_TOKEN" ] && [ -n "$GHCR_EMAIL" ]; then
+            kubectl -n tallermgf delete secret ghcr-creds --ignore-not-found
+            kubectl -n tallermgf create secret docker-registry ghcr-creds \
+              --docker-server=ghcr.io \
+              --docker-username="$GHCR_USER" \
+              --docker-password="$GHCR_TOKEN" \
+              --docker-email="$GHCR_EMAIL"
+            kubectl -n tallermgf patch deploy/tallermgf --type=merge -p \
+              '{"spec":{"template":{"spec":{"imagePullSecrets":[{"name":"ghcr-creds"}]}}}}' || true
+          else
+            echo "Skipping imagePullSecret (no GHCR_* secrets)."
+          fi
+
       - name: Inject image into deployment
         run: |
           IMG="${{ steps.vars.outputs.image_ref }}"
           sed -i "s|__IMAGE_PLACEHOLDER__|${IMG}|g" k8s/deployment.yaml
+          echo "Using image: ${IMG}"
           grep -n 'image:' k8s/deployment.yaml
 
       - name: Apply manifests
