@@ -8,7 +8,6 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
   build:
@@ -21,18 +20,18 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Log in to Container Registry
+      - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata
+      - name: Extract metadata (tags/labels)
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          images: ${{ env.REGISTRY }}/${{ toLower(github.repository) }}   # 👈 siempre minúsculas
           tags: |
             type=ref,event=branch
             type=ref,event=pr
@@ -47,19 +46,14 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
-      # Opcional: publica el tag que vas a usar en deploy (branch-SHA)
-      - name: Set image tag output
-        id: tag
-        run: echo "IMAGE_TAG=${GITHUB_REF_NAME}-${GITHUB_SHA}" >> $GITHUB_OUTPUT
-
   deploy:
     needs: [build]
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: [self-hosted, Linux, X64]   # tu runner privado
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
     env:
       REGISTRY: ghcr.io
-      IMAGE_NAME: ${{ github.repository }}
-      IMAGE_TAG: ${{ github.ref_name }}-${{ github.sha }}
+      IMAGE_NAME: ${{ toLower(github.repository) }}                        # 👈 minúsculas
+      IMAGE_TAG: ${{ github.ref_name }}-${{ github.sha }}                  # p.ej. master-<sha>
 
     steps:
       - name: Checkout repository
@@ -68,7 +62,7 @@ jobs:
       - name: Set up kubectl
         uses: azure/setup-kubectl@v4
         with:
-          version: 'v1.30.0'
+          version: 'v1.30.0'   # o la que prefieras
 
       - name: Configure kubeconfig
         run: |
@@ -80,13 +74,16 @@ jobs:
         run: |
           kubectl apply -f k8s/namespace.yaml
 
-      - name: Inject image tag into deployment
+      - name: Inject image into deployment
         run: |
           IMG="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}"
           sed -i "s|__IMAGE_PLACEHOLDER__|${IMG}|g" k8s/deployment.yaml
+          echo "Using image: ${IMG}"
+          grep -n 'image:' k8s/deployment.yaml
 
       - name: Apply manifests
         run: |
+          set -euxo pipefail
           kubectl apply -f k8s/deployment.yaml
           kubectl apply -f k8s/service.yaml
           kubectl apply -f k8s/ingress.yaml
@@ -95,3 +92,20 @@ jobs:
         run: |
           kubectl rollout status deployment/tallermgf -n tallermgf --timeout=300s
           kubectl get all -n tallermgf
+
+      - name: Debug on failure
+        if: failure()
+        run: |
+          set +e
+          echo "---- DEPLOY ----"
+          kubectl get deploy tallermgf -n tallermgf -o yaml | egrep -A2 'name:|image:|strategy:' || true
+          echo "---- RS ----"
+          kubectl get rs -n tallermgf -o wide || true
+          echo "---- PODS ----"
+          kubectl get pods -n tallermgf -o wide || true
+          echo "---- EVENTS ----"
+          kubectl get events -n tallermgf --sort-by=.lastTimestamp | tail -n 100 || true
+          for p in $(kubectl get pods -n tallermgf -o name); do
+            echo "---- DESCRIBE $p ----"
+            kubectl describe -n tallermgf $p || true
+          done
