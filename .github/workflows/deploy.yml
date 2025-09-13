@@ -36,11 +36,11 @@ jobs:
         # Aplicar namespace primero
         kubectl apply -f k8s/namespace.yaml
         
-        # Actualizar el deployment con la nueva imagen
-        kubectl patch deployment tallermgf -n tallermgf -p '{"spec":{"template":{"spec":{"containers":[{"name":"tallermgf","image":"tallermgf:latest","imagePullPolicy":"Never"}]}}}}'
+        # Crear deployment temporal con la imagen correcta
+        sed "s|image:|image: tallermgf:latest|g" k8s/deployment.yaml > /tmp/deployment-temp.yaml
         
-        # Aplicar el resto de manifiestos
-        kubectl apply -f k8s/deployment.yaml
+        # Aplicar manifiestos
+        kubectl apply -f /tmp/deployment-temp.yaml
         kubectl apply -f k8s/service.yaml
         kubectl apply -f k8s/ingress.yaml
 

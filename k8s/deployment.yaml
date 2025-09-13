@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: tallermgf
-  namespace: tallermgf   # 👈 añade esto
+  namespace: tallermgf
   labels:
     app: tallermgf
 spec:
@@ -17,7 +17,8 @@ spec:
     spec:
       containers:
       - name: tallermgf
-        image: 
+        image: tallermgf:latest
+        imagePullPolicy: Never  # Para imágenes locales
         ports:
         - containerPort: 5000
         env:
