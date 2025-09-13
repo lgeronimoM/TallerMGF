@@ -1,163 +1,82 @@
-name: Build and Deploy to Kubernetes
+# .github/workflows/deploy.yml
+name: Deploy TallerMGF to Local Kubernetes
 
 on:
   push:
-    branches:
-      - master
-  pull_request:
-    branches:
-      - master
-
-env:
-  REGISTRY: ghcr.io
+    branches: [ master ]
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Compute image vars (lowercase + tag)
-        id: imgvars
-        run: |
-          echo "image_name_lc=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
-          echo "image_tag=${GITHUB_REF_NAME}-${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build & push (branch-SHA + latest)
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          push: true
-          tags: |
-            ${{ env.REGISTRY }}/${{ steps.imgvars.outputs.image_name_lc }}:${{ steps.imgvars.outputs.image_tag }}
-            ${{ env.REGISTRY }}/${{ steps.imgvars.outputs.image_name_lc }}:latest
-
   deploy:
-    needs: build
-    runs-on:
-      - self-hosted
-      - Linux
-      - X64
-    if: ${{ github.ref == 'refs/heads/master' }}
-    env:
-      REGISTRY: ghcr.io
-
+    runs-on: self-hosted
+    
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+    - name: 📥 Checkout código
+      uses: actions/checkout@v4
 
-      - name: Compute image ref
-        id: img
-        shell: bash
-        run: |
-          IMAGE_NAME_LC=$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]')
-          IMAGE_TAG="${GITHUB_REF_NAME}-${GITHUB_SHA}"
-          IMAGE_REF="${REGISTRY}/${IMAGE_NAME_LC}:${IMAGE_TAG}"
-          echo "name=${IMAGE_NAME_LC}" >> "$GITHUB_OUTPUT"
-          echo "tag=${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
-          echo "ref=${IMAGE_REF}" >> "$GITHUB_OUTPUT"
-          echo "Using image: ${IMAGE_REF}"
+    - name: 🔍 Verificar herramientas
+      run: |
+        echo "🐳 Verificando Docker..."
+        docker --version
+        echo "☸️ Verificando kubectl..."
+        kubectl version --client
+        echo "📦 Verificando conexión al cluster..."
+        kubectl cluster-info
 
-      - name: Set up kubectl
-        uses: azure/setup-kubectl@v4
-        with:
-          version: v1.30.0
+    - name: 🏗️ Construir imagen Docker
+      run: |
+        echo "🔨 Construyendo imagen tallermgf..."
+        docker build -t tallermgf:latest .
+        docker build -t tallermgf:${{ github.sha }} .
+        echo "✅ Imagen construida exitosamente"
 
-      - name: Configure kubeconfig
-        shell: bash
-        run: |
-          mkdir -p ~/.kube
-          echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > ~/.kube/config
-          chmod 600 ~/.kube/config
+    - name: 🚀 Desplegar a Kubernetes
+      run: |
+        echo "📋 Aplicando manifiestos..."
+        
+        # Aplicar namespace primero
+        kubectl apply -f k8s/namespace.yaml
+        
+        # Actualizar el deployment con la nueva imagen
+        kubectl patch deployment tallermgf -n tallermgf -p '{"spec":{"template":{"spec":{"containers":[{"name":"tallermgf","image":"tallermgf:latest","imagePullPolicy":"Never"}]}}}}'
+        
+        # Aplicar el resto de manifiestos
+        kubectl apply -f k8s/deployment.yaml
+        kubectl apply -f k8s/service.yaml
+        kubectl apply -f k8s/ingress.yaml
 
-      - name: Ensure namespace
-        run: kubectl apply -f k8s/namespace.yaml
+    - name: ⏳ Esperar deployment
+      run: |
+        echo "🕐 Esperando que el deployment esté listo..."
+        kubectl wait --for=condition=available --timeout=300s deployment/tallermgf -n tallermgf
+        
+    - name: 🔄 Reiniciar deployment (para nueva imagen)
+      run: |
+        echo "🔄 Reiniciando deployment para usar nueva imagen..."
+        kubectl rollout restart deployment/tallermgf -n tallermgf
+        kubectl rollout status deployment/tallermgf -n tallermgf --timeout=300s
 
-      # (Opcional) Si tu imagen es PRIVADA en GHCR, define GHCR_USER/GHCR_TOKEN(read:packages)/GHCR_EMAIL en Secrets
-      - name: Ensure imagePullSecret (if private)
-        env:
-          GHCR_USER: ${{ secrets.GHCR_USER }}
-          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
-          GHCR_EMAIL: ${{ secrets.GHCR_EMAIL }}
-        run: |
-          if [ -n "$GHCR_USER" ] && [ -n "$GHCR_TOKEN" ] && [ -n "$GHCR_EMAIL" ]; then
-            kubectl -n tallermgf delete secret ghcr-creds --ignore-not-found
-            kubectl -n tallermgf create secret docker-registry ghcr-creds \
-              --docker-server=ghcr.io \
-              --docker-username="$GHCR_USER" \
-              --docker-password="$GHCR_TOKEN" \
-              --docker-email="$GHCR_EMAIL"
-            kubectl -n tallermgf patch deploy/tallermgf --type=merge -p \
-              '{"spec":{"template":{"spec":{"imagePullSecrets":[{"name":"ghcr-creds"}]}}}}' || true
-          else
-            echo "Skipping imagePullSecret (no GHCR_* secrets)."
-          fi
+    - name: ✅ Verificar estado
+      run: |
+        echo "📊 Estado del deployment:"
+        kubectl get pods -n tallermgf
+        echo ""
+        echo "🌐 Servicios:"
+        kubectl get svc -n tallermgf
+        echo ""
+        echo "🔗 Ingress:"
+        kubectl get ingress -n tallermgf
 
-      # Restaura el YAML del repo por si otro run lo dejó modificado
-      - name: Restore base deployment
-        run: git checkout -- k8s/deployment.yaml
-
-      # Inyecta la imagen en el YAML (funciona si hay __IMAGE_PLACEHOLDER__, si image: está vacío o si falta image:)
-      - name: Inject image into deployment.yaml
-        shell: bash
-        run: |
-          set -euo pipefail
-          IMG="${{ steps.img.outputs.ref }}"
-
-          echo ">>> Antes:"
-          grep -n 'image:' -n k8s/deployment.yaml || true
-
-          if grep -q '__IMAGE_PLACEHOLDER__' k8s/deployment.yaml; then
-            sed -i "s|__IMAGE_PLACEHOLDER__|${IMG}|g" k8s/deployment.yaml
-          elif grep -Eq '^[[:space:]]*image:[[:space:]]*$' k8s/deployment.yaml; then
-            sed -i "s|^\([[:space:]]*image:\)[[:space:]]*$|\1 ${IMG}|" k8s/deployment.yaml
-          elif ! grep -Eq '^[[:space:]]*image:[[:space:]]' k8s/deployment.yaml; then
-            # Inserta la línea 'image: ...' después del contenedor 'tallermgf'
-            awk -v img="$IMG" '
-              $0 ~ /- name:[[:space:]]*tallermgf/ && !ins {
-                print
-                getline
-                if ($0 ~ /^[[:space:]]*image:/) { sub(/image:.*/, "image: " img); print; ins=1; next }
-                print "        image: " img
-                print
-                ins=1
-                next
-              }
-              {print}
-            ' k8s/deployment.yaml > k8s/deployment.patched.yaml && mv k8s/deployment.patched.yaml k8s/deployment.yaml
-          fi
-
-          echo ">>> Después:"
-          grep -n 'image:' -n k8s/deployment.yaml || (echo "ERROR: no se pudo establecer image:"; exit 1)
-
-      - name: Apply manifests
-        run: |
-          set -euxo pipefail
-          kubectl apply -f k8s/deployment.yaml
-          kubectl apply -f k8s/service.yaml
-          kubectl apply -f k8s/ingress.yaml
-
-      - name: Verify rollout
-        run: |
-          kubectl rollout status deployment/tallermgf -n tallermgf --timeout=300s
-          kubectl get rs,pods -n tallermgf -o wide
-
-      - name: Debug on failure
-        if: failure()
-        run: |
-          kubectl get deploy tallermgf -n tallermgf -o yaml | egrep -A3 'name:|namespace:|image:|strategy:' || true
-          kubectl get rs -n tallermgf -o wide || true
-          kubectl get pods -n tallermgf -o wide || true
-          kubectl get events -n tallermgf --sort-by=.lastTimestamp | tail -n 150 || true
+    - name: 📝 Información de acceso
+      run: |
+        echo ""
+        echo "🎉 ¡Deployment completado!"
+        echo "==============================="
+        echo "🌍 URL: http://tallermgf.local"
+        echo "🏥 Health: http://tallermgf.local/health"
+        echo ""
+        echo "Para verificar que todo funciona:"
+        echo "  kubectl logs -f deployment/tallermgf -n tallermgf"
+        echo ""
+        echo "Para acceder localmente (si no tienes ingress):"
+        echo "  kubectl port-forward svc/tallermgf-service 8080:80 -n tallermgf"
+        echo "  Luego visita: http://localhost:8080"
