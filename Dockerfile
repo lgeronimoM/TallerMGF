@@ -6,7 +6,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
-EXPOSE 5000
+EXPOSE 8080
 
 # Si tu objeto Flask es 'app' (en app.py)
-CMD ["gunicorn","-b","0.0.0.0:5000","app:app"]
+CMD ["gunicorn","-b","0.0.0.0:8080","app:app"]
