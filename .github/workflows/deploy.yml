@@ -15,7 +15,7 @@ jobs:
     - name: 🔍 Verificar herramientas
       run: |
         echo "🐳 Docker:" && docker --version
-        echo "☸️ Kubectl:" && kubectl version --client=true --short
+        echo "☸️ Kubectl (cliente):" && kubectl version --client=true
         echo "📦 Cluster info:" && kubectl cluster-info
 
     - name: 🛢️ Asegurar registry local en localhost:5000
@@ -45,7 +45,6 @@ jobs:
       run: |
         echo "📋 Aplicando manifiestos…"
         kubectl apply -f k8s/namespace.yaml
-        # Sustituir SOLO la línea 'image:' por la imagen con SHA
         sed -E 's|^(\s*image:\s*).*$|\1'"${IMG_SHA}"'|' k8s/deployment.yaml > /tmp/deployment-temp.yaml
         kubectl apply -f /tmp/deployment-temp.yaml
         kubectl apply -f k8s/service.yaml
@@ -88,9 +87,9 @@ jobs:
         echo "URL:       http://tallermgf.local"
         echo "Health:    http://tallermgf.local/health"
         echo
-        echo "Si no resuelve el host, añade en /etc/hosts de tu máquina:"
+        echo "Si no resuelve el host, añade en /etc/hosts:"
         echo "  127.0.0.1 tallermgf.local"
         echo
-        echo "Para inspección rápida sin ingress:"
+        echo "Sin ingress (prueba rápida):"
         echo "  kubectl -n tallermgf port-forward svc/tallermgf-service 8080:80"
         echo "  curl http://localhost:8080/health"
