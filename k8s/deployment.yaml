@@ -1,22 +1,22 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: flask-app
+  name: tallermgf
   labels:
-    app: flask-app
+    app: tallermgf
 spec:
-  replicas: 3
+  replicas: 1
   selector:
     matchLabels:
-      app: flask-app
+      app: tallermgf
   template:
     metadata:
       labels:
-        app: flask-app
+        app: tallermgf
     spec:
       containers:
-      - name: flask-app
-        image: IMAGE_TAG
+      - name: tallermgf
+        image: __IMAGE_PLACEHOLDER__
         ports:
         - containerPort: 5000
         env:

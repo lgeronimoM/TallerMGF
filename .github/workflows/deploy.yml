@@ -54,12 +54,12 @@ jobs:
 
   deploy:
     needs: [build]
-    # 👇 CAMBIO CLAVE: usar tu self-hosted runner (labels exactos de tu captura)
     runs-on: [self-hosted, Linux, X64]
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
     env:
-      # usa el mismo tag branch-SHA que construiste arriba
-      IMAGE_TAG: ${{ needs.build.outputs.IMAGE_TAG || format('{0}-{1}', github.ref_name, github.sha) }}
+      REGISTRY: ghcr.io
+      IMAGE_NAME: ${{ github.repository }}
+      IMAGE_TAG: ${{ github.ref_name }}-${{ github.sha }}
 
     steps:
       - name: Checkout repository
@@ -76,59 +76,22 @@ jobs:
           echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > ~/.kube/config
           chmod 600 ~/.kube/config
 
-      - name: Preflight (red y API server)
+      - name: Ensure namespace exists
         run: |
-          set -euxo pipefail
-          timeout 5 bash -c '</dev/tcp/10.10.4.80/6443' && echo "TCP OK" || (echo "TCP FAIL"; exit 1)
-          kubectl version --client=true
-          kubectl cluster-info
-          kubectl get nodes
+          kubectl apply -f k8s/namespace.yaml
 
-      - name: Deploy to Kubernetes
+      - name: Inject image tag into deployment
         run: |
-          cat <<EOF > deployment.yml
-          apiVersion: apps/v1
-          kind: Deployment
-          metadata:
-            name: flask-app
-            labels: { app: flask-app }
-          spec:
-            replicas: 3
-            selector:
-              matchLabels: { app: flask-app }
-            template:
-              metadata:
-                labels: { app: flask-app }
-              spec:
-                containers:
-                - name: flask-app
-                  image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
-                  ports: [ { containerPort: 5000 } ]
-                  env: [ { name: FLASK_ENV, value: "production" } ]
-                  resources:
-                    requests: { memory: "64Mi", cpu: "50m" }
-                    limits:   { memory: "128Mi", cpu: "100m" }
-          ---
-          apiVersion: v1
-          kind: Service
-          metadata:
-            name: flask-app-service
-            labels: { app: flask-app }
-          spec:
-            type: ClusterIP
-            ports:
-            - port: 80
-              targetPort: 5000
-              protocol: TCP
-            selector:
-              app: flask-app
-          EOF
+          IMG="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}"
+          sed -i "s|__IMAGE_PLACEHOLDER__|${IMG}|g" k8s/deployment.yaml
 
-          kubectl apply --dry-run=client -f deployment.yml
-          kubectl apply -f deployment.yml
-
-      - name: Verify deployment
+      - name: Apply manifests
         run: |
-          kubectl rollout status deployment/flask-app -n default --timeout=300s
-          kubectl get services -n default
+          kubectl apply -f k8s/deployment.yaml
+          kubectl apply -f k8s/service.yaml
+          kubectl apply -f k8s/ingress.yaml
 
+      - name: Verify rollout
+        run: |
+          kubectl rollout status deployment/flask-app -n tallermgf --timeout=300s
+          kubectl get all -n tallermgf
