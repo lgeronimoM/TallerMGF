@@ -17,8 +17,9 @@ spec:
     spec:
       containers:
       - name: tallermgf
-        image: tallermgf:latest
-        imagePullPolicy: Never  # Para imágenes locales
+        # 👇 Esta línea la sustituye el CI con el SHA:
+        image: localhost:5000/tallermgf:latest
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 5000
         env:

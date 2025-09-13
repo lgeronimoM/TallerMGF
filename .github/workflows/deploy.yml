@@ -1,4 +1,3 @@
-# .github/workflows/deploy.yml
 name: Deploy TallerMGF to Local Kubernetes
 
 on:
@@ -7,21 +6,91 @@ on:
 
 jobs:
   deploy:
-    runs-on: self-hosted  # Tu runner local sigue igual
-    
+    runs-on: self-hosted
+
     steps:
-    - name: Checkout código
+    - name: 📥 Checkout código
       uses: actions/checkout@v4
 
-    - name: Construir imagen
-      run: docker build -t tallermgf:latest .
-
-    - name: Aplicar manifiestos
+    - name: 🔍 Verificar herramientas
       run: |
+        echo "🐳 Docker:" && docker --version
+        echo "☸️ Kubectl:" && kubectl version --client=true --short
+        echo "📦 Cluster info:" && kubectl cluster-info
+
+    - name: 🛢️ Asegurar registry local en localhost:5000
+      run: |
+        if ! docker ps --format '{{.Names}}' | grep -q '^registry$'; then
+          if docker ps -a --format '{{.Names}}' | grep -q '^registry$'; then
+            docker start registry
+          else
+            docker run -d --restart=always -p 5000:5000 --name registry registry:2
+          fi
+        fi
+        echo "✅ Registry local listo en http://localhost:5000"
+
+    - name: 🏗️ Construir, etiquetar y publicar imagen
+      env:
+        IMG_SHA: localhost:5000/tallermgf:${{ github.sha }}
+      run: |
+        echo "🔨 Construyendo imagen…"
+        docker build -t tallermgf:latest .
+        docker tag tallermgf:latest "${IMG_SHA}"
+        docker push "${IMG_SHA}"
+        echo "✅ Publicada ${IMG_SHA}"
+
+    - name: 🚀 Desplegar a Kubernetes
+      env:
+        IMG_SHA: localhost:5000/tallermgf:${{ github.sha }}
+      run: |
+        echo "📋 Aplicando manifiestos…"
         kubectl apply -f k8s/namespace.yaml
-        kubectl apply -f k8s/deployment.yaml
+        # Sustituir SOLO la línea 'image:' por la imagen con SHA
+        sed -E 's|^(\s*image:\s*).*$|\1'"${IMG_SHA}"'|' k8s/deployment.yaml > /tmp/deployment-temp.yaml
+        kubectl apply -f /tmp/deployment-temp.yaml
         kubectl apply -f k8s/service.yaml
         kubectl apply -f k8s/ingress.yaml
 
-    - name: Verificar
-      run: kubectl get pods -n tallermgf
+    - name: ⏳ Esperar rollout del deployment
+      run: |
+        set -e
+        kubectl rollout status deployment/tallermgf -n tallermgf --timeout=300s
+
+    - name: ✅ Verificación final
+      run: |
+        echo "📊 Deployment:"
+        kubectl get deployment tallermgf -n tallermgf -o wide
+        echo; echo "📋 Pods:"
+        kubectl get pods -n tallermgf -o wide
+        echo; echo "🌐 Services:"
+        kubectl get svc -n tallermgf
+        echo; echo "🔗 Ingress:"
+        kubectl get ingress -n tallermgf
+        echo; echo "🔍 Últimos eventos:"
+        kubectl get events -n tallermgf --sort-by='.lastTimestamp' | tail -50
+
+    - name: 🧰 Diagnóstico si algo falla
+      if: failure()
+      run: |
+        echo "❌ Falló el despliegue; recolectando diagnóstico…"
+        kubectl describe deployment/tallermgf -n tallermgf || true
+        kubectl describe pods -n tallermgf || true
+        kubectl get events -n tallermgf --sort-by='.lastTimestamp' | tail -100 || true
+        POD=$(kubectl get pods -n tallermgf -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+        if [ -n "$POD" ]; then
+          echo; echo "🧾 Logs del Pod ${POD}:"
+          kubectl logs "$POD" -n tallermgf --all-containers=true || true
+        fi
+
+    - name: 📝 Información de acceso
+      run: |
+        echo "🎉 ¡Deployment completado!"
+        echo "URL:       http://tallermgf.local"
+        echo "Health:    http://tallermgf.local/health"
+        echo
+        echo "Si no resuelve el host, añade en /etc/hosts de tu máquina:"
+        echo "  127.0.0.1 tallermgf.local"
+        echo
+        echo "Para inspección rápida sin ingress:"
+        echo "  kubectl -n tallermgf port-forward svc/tallermgf-service 8080:80"
+        echo "  curl http://localhost:8080/health"
