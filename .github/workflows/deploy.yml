@@ -55,16 +55,36 @@ jobs:
         kubectl rollout restart deployment/tallermgf -n tallermgf
         kubectl rollout status deployment/tallermgf -n tallermgf --timeout=300s
 
-    - name: ✅ Verificar estado
+    - name: ✅ Verificar estado final
       run: |
-        echo "📊 Estado del deployment:"
-        kubectl get pods -n tallermgf
+        echo "📊 Estado final del deployment:"
+        kubectl get deployment tallermgf -n tallermgf -o wide
+        
+        echo ""
+        echo "📋 Pods en ejecución:"
+        kubectl get pods -n tallermgf -o wide
+        
         echo ""
         echo "🌐 Servicios:"
         kubectl get svc -n tallermgf
+        
         echo ""
         echo "🔗 Ingress:"
         kubectl get ingress -n tallermgf
+        
+        echo ""
+        echo "🔍 Eventos recientes:"
+        kubectl get events -n tallermgf --sort-by='.lastTimestamp' | tail -10
+        
+        # Verificar que los pods estén corriendo
+        READY_PODS=$(kubectl get pods -n tallermgf -o jsonpath='{.items[*].status.conditions[?(@.type=="Ready")].status}' | grep -c "True" || echo "0")
+        if [ "$READY_PODS" -eq "0" ]; then
+          echo "❌ No hay pods listos"
+          kubectl describe pods -n tallermgf
+          exit 1
+        else
+          echo "✅ $READY_PODS pod(s) listo(s)"
+        fi
 
     - name: 📝 Información de acceso
       run: |
