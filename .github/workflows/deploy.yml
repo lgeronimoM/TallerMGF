@@ -1,3 +1,4 @@
+# .github/workflows/deploy.yml
 name: Deploy TallerMGF to Local Kubernetes
 
 on:
@@ -6,26 +7,21 @@ on:
 
 jobs:
   deploy:
-    runs-on: self-hosted
+    runs-on: self-hosted  # Tu runner local sigue igual
     
     steps:
     - name: Checkout código
       uses: actions/checkout@v4
 
     - name: Construir imagen
-      run: docker build -t tallermgf:${{ github.sha }} .
+      run: docker build -t tallermgf:latest .
 
     - name: Aplicar manifiestos
       run: |
-        # Reemplazar imagen en el deployment
-        sed "s|tallermgf:latest|tallermgf:${{ github.sha }}|g" k8s/deployment.yaml > /tmp/deployment.yaml
-        
         kubectl apply -f k8s/namespace.yaml
-        kubectl apply -f /tmp/deployment.yaml
+        kubectl apply -f k8s/deployment.yaml
         kubectl apply -f k8s/service.yaml
         kubectl apply -f k8s/ingress.yaml
 
     - name: Verificar
-      run: |
-        kubectl get pods -n tallermgf
-        echo "App disponible en: http://tallermgf.local"
+      run: kubectl get pods -n tallermgf
