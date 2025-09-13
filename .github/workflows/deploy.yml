@@ -1,4 +1,3 @@
-# .github/workflows/deploy.yml
 name: Deploy TallerMGF to Local Kubernetes
 
 on:
@@ -10,93 +9,23 @@ jobs:
     runs-on: self-hosted
     
     steps:
-    - name: 📥 Checkout código
+    - name: Checkout código
       uses: actions/checkout@v4
 
-    - name: 🔍 Verificar herramientas
-      run: |
-        echo "🐳 Verificando Docker..."
-        docker --version
-        echo "☸️ Verificando kubectl..."
-        kubectl version --client
-        echo "📦 Verificando conexión al cluster..."
-        kubectl cluster-info
+    - name: Construir imagen
+      run: docker build -t tallermgf:${{ github.sha }} .
 
-    - name: 🏗️ Construir imagen Docker
+    - name: Aplicar manifiestos
       run: |
-        echo "🔨 Construyendo imagen tallermgf..."
-        docker build -t tallermgf:latest .
-        docker build -t tallermgf:${{ github.sha }} .
-        echo "✅ Imagen construida exitosamente"
-
-    - name: 🚀 Desplegar a Kubernetes
-      run: |
-        echo "📋 Aplicando manifiestos..."
+        # Reemplazar imagen en el deployment
+        sed "s|tallermgf:latest|tallermgf:${{ github.sha }}|g" k8s/deployment.yaml > /tmp/deployment.yaml
         
-        # Aplicar namespace primero
         kubectl apply -f k8s/namespace.yaml
-        
-        # Crear deployment temporal con la imagen correcta
-        sed "s|image:|image: tallermgf:latest|g" k8s/deployment.yaml > /tmp/deployment-temp.yaml
-        
-        # Aplicar manifiestos
-        kubectl apply -f /tmp/deployment-temp.yaml
+        kubectl apply -f /tmp/deployment.yaml
         kubectl apply -f k8s/service.yaml
         kubectl apply -f k8s/ingress.yaml
 
-    - name: ⏳ Esperar deployment
+    - name: Verificar
       run: |
-        echo "🕐 Esperando que el deployment esté listo..."
-        kubectl wait --for=condition=available --timeout=300s deployment/tallermgf -n tallermgf
-        
-    - name: 🔄 Reiniciar deployment (para nueva imagen)
-      run: |
-        echo "🔄 Reiniciando deployment para usar nueva imagen..."
-        kubectl rollout restart deployment/tallermgf -n tallermgf
-        kubectl rollout status deployment/tallermgf -n tallermgf --timeout=300s
-
-    - name: ✅ Verificar estado final
-      run: |
-        echo "📊 Estado final del deployment:"
-        kubectl get deployment tallermgf -n tallermgf -o wide
-        
-        echo ""
-        echo "📋 Pods en ejecución:"
-        kubectl get pods -n tallermgf -o wide
-        
-        echo ""
-        echo "🌐 Servicios:"
-        kubectl get svc -n tallermgf
-        
-        echo ""
-        echo "🔗 Ingress:"
-        kubectl get ingress -n tallermgf
-        
-        echo ""
-        echo "🔍 Eventos recientes:"
-        kubectl get events -n tallermgf --sort-by='.lastTimestamp' | tail -10
-        
-        # Verificar que los pods estén corriendo
-        READY_PODS=$(kubectl get pods -n tallermgf -o jsonpath='{.items[*].status.conditions[?(@.type=="Ready")].status}' | grep -c "True" || echo "0")
-        if [ "$READY_PODS" -eq "0" ]; then
-          echo "❌ No hay pods listos"
-          kubectl describe pods -n tallermgf
-          exit 1
-        else
-          echo "✅ $READY_PODS pod(s) listo(s)"
-        fi
-
-    - name: 📝 Información de acceso
-      run: |
-        echo ""
-        echo "🎉 ¡Deployment completado!"
-        echo "==============================="
-        echo "🌍 URL: http://tallermgf.local"
-        echo "🏥 Health: http://tallermgf.local/health"
-        echo ""
-        echo "Para verificar que todo funciona:"
-        echo "  kubectl logs -f deployment/tallermgf -n tallermgf"
-        echo ""
-        echo "Para acceder localmente (si no tienes ingress):"
-        echo "  kubectl port-forward svc/tallermgf-service 8080:80 -n tallermgf"
-        echo "  Luego visita: http://localhost:8080"
+        kubectl get pods -n tallermgf
+        echo "App disponible en: http://tallermgf.local"
