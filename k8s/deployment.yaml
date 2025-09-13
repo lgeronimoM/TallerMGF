@@ -3,22 +3,19 @@ kind: Deployment
 metadata:
   name: tallermgf
   namespace: tallermgf
-  labels:
-    app: tallermgf
+  labels: { app: tallermgf }
 spec:
   replicas: 1
   selector:
-    matchLabels:
-      app: tallermgf
+    matchLabels: { app: tallermgf }
   template:
     metadata:
-      labels:
-        app: tallermgf
+      labels: { app: tallermgf }
     spec:
       containers:
       - name: tallermgf
-        # 👇 Esta línea la sustituye el CI con el SHA:
-        image: localhost:5000/tallermgf:latest
+        # ⚠️ Esta línea la SOBREESCRIBE el workflow con el tag SHA de GHCR
+        image: ghcr.io/OWNER/tallermgf:latest
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 5000
