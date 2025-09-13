@@ -93,5 +93,5 @@ jobs:
 
       - name: Verify rollout
         run: |
-          kubectl rollout status deployment/flask-app -n tallermgf --timeout=300s
+          kubectl rollout status deployment/tallermgf -n tallermgf --timeout=300s
           kubectl get all -n tallermgf
