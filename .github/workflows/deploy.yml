@@ -8,7 +8,7 @@ jobs:
   deploy:
     runs-on: self-hosted
     env:
-      DOCKERHUB_REPO: TUUSUARIO/tallermgf   # ← tu repo público en Docker Hub
+      DOCKERHUB_REPO: lgeronimom/tallermgf   # ← tu repo público en Docker Hub
       NAMESPACE: tallermgf
 
     steps:
