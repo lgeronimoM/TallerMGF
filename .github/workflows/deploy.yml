@@ -27,12 +27,12 @@ jobs:
         run: |
           echo "$DH_PASS" | docker login -u "$DH_USER" --password-stdin
       
-      - name: 🏗️ Build & Push (tags SHA y latest)
+      - name: 🏗️ Build & Push (tags SHA y latest) - FORCE REBUILD
         env:
           IMAGE_SHA: ${{ env.DOCKERHUB_REPO }}:${{ github.sha }}
           IMAGE_LATEST: ${{ env.DOCKERHUB_REPO }}:latest
         run: |
-          docker build -t "$IMAGE_SHA" .
+          docker build --no-cache -t "$IMAGE_SHA" .
           docker tag "$IMAGE_SHA" "$IMAGE_LATEST"
           docker push "$IMAGE_SHA"
           docker push "$IMAGE_LATEST"
@@ -47,7 +47,7 @@ jobs:
       
       - name: 🔄 Actualizar imagen a la del commit (SHA)
         run: |
-          kubectl -n $NAMESPACE set image deployment/tallermgf tallermgf=${IMAGE_SHA} --record
+          kubectl -n $NAMESPACE set image deployment/tallermgf tallermgf=${IMAGE_SHA}
       
       - name: ⏳ Esperar rollout
         run: kubectl -n $NAMESPACE rollout status deploy/tallermgf --timeout=300s
