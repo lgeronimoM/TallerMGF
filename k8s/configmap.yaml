@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tallermgf-config
+  namespace: tallermgf
+data:
+  SERVER: "0.0.0.0"
+  PORT: "8080"
+  PMAIL: "587"
+  SMTP: "smtp.office365.com"
+  SEMAIL: "servers@encontrack.com"
+  REMAIL: "luis.geronimo@encontrack.com"
+  FLASK_ENV: "production"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: tallermgf-secrets
+  namespace: tallermgf
+type: Opaque
+data:
+  # Base64 encoded password: echo -n "Tav76551" | base64
+  EPASS: VGF2NzY1NTE=
+  # Base64 encoded secret key: echo -n "your-secret-key" | base64
+  SECRET_KEY: bXlzZWNyZXQ=

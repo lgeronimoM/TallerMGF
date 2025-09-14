@@ -17,10 +17,12 @@ spec:
         image: lgeronimom/tallermgf:latest   # ← se actualiza por CI, pero deja "latest" aquí
         imagePullPolicy: IfNotPresent
         ports:
-        - containerPort: 8080               # ← tu app escucha en 8080
-        env:
-        - name: FLASK_ENV
-          value: "production"
+        - containerPort: 8080
+        envFrom:
+           - configMapRef:
+               name: tallermgf-config
+           - secretRef:
+               name: tallermgf-secrets               # ← tu app escucha en 8080
         resources:
           requests: { memory: "64Mi", cpu: "50m" }
           limits:   { memory: "128Mi", cpu: "100m" }
