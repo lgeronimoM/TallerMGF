@@ -1,9 +1,2 @@
-# Core Flask dependencies
 flask==3.0.0
 gunicorn==21.2.0
-
-# CORS support
-flask-cors==4.0.0
-
-# System monitoring
-psutil==5.9.6
