@@ -64,3 +64,34 @@ jobs:
           kubectl -n $NAMESPACE describe deployment/tallermgf || true
           kubectl -n $NAMESPACE describe pods || true
           kubectl -n $NAMESPACE get events --sort-by='.lastTimestamp' | tail -150 || true
+
+######################## GitHub Metrics #################################
+
+      - name: 📈 Registrar push en InfluxDB
+        if: always()
+        env:
+          INFLUX_URL: ${{ secrets.INFLUX_URL }}
+          INFLUX_ORG: ${{ secrets.INFLUX_ORG }}
+          INFLUX_BUCKET: ${{ secrets.INFLUX_BUCKET }}
+          INFLUX_TOKEN: ${{ secrets.INFLUX_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          GH_BRANCH: ${{ github.ref_name }}
+          GH_USER: ${{ github.actor }}
+          GH_TS: ${{ github.event.head_commit.timestamp }}
+        run: |
+          set -euo pipefail
+          esc() { sed -E 's/([ ,=])/\\\1/g'; }
+          user=$(printf '%s' "$GH_USER" | esc)
+          repo=$(printf '%s' "$GH_REPO" | esc)
+          branch=$(printf '%s' "$GH_BRANCH" | esc)
+          if [ -n "${GH_TS:-}" ]; then
+            ts=$(date -u -d "$GH_TS" +%s%N)
+          else
+            ts=$(date -u +%s%N)
+          fi
+          line="github_pushes,user=${user},repo=${repo},branch=${branch} value=1 ${ts}"
+          echo "Line protocol → $line"
+          curl -sfS -X POST "$INFLUX_URL/api/v2/write?org=$INFLUX_ORG&bucket=$INFLUX_BUCKET" \
+            -H "Authorization: Token $INFLUX_TOKEN" \
+            -H "Content-Type: text/plain; charset=utf-8" \
+            --data-binary "$line"
