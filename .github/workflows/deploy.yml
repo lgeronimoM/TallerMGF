@@ -73,24 +73,28 @@ jobs:
           INFLUX_ORG: ${{ secrets.INFLUX_ORG }}
           INFLUX_BUCKET: ${{ secrets.INFLUX_BUCKET }}
           INFLUX_TOKEN: ${{ secrets.INFLUX_TOKEN }}
-          STATUS: ${{ failure() && 'failure' || cancelled() && 'cancelled' || 'success' }}
+          STATUS: ${{ job.status }}              # success | failure | cancelled
         run: |
-          # Escapar caracteres especiales para InfluxDB
-          escape() { echo "$1" | sed 's/[ ,=]/\\&/g'; }
-          
-          USER=$(escape "${{ github.actor }}")
-          REPO=$(escape "${{ github.repository }}")
-          BRANCH=$(escape "${{ github.ref_name }}")
-          STATUS_ESC=$(escape "$STATUS")
-          
-          # Usar timestamp del commit o actual
-          TIMESTAMP=${{ github.event.head_commit.timestamp && 'date -u -d "${{ github.event.head_commit.timestamp }}" +%s%N' || 'date -u +%s%N' }}
-          TS=$(eval $TIMESTAMP)
-          
-          # Enviar métrica a InfluxDB
+          set -euo pipefail
+          # Escapar tags para line protocol (espacio, coma, '=')
+          esc() { sed -E 's/([ ,=])/\\\1/g'; }
+
+          USER=$(esc "${{ github.actor }}")
+          REPO=$(esc "${{ github.repository }}")
+          BRANCH=$(esc "${{ github.ref_name }}")
+          STATUS_ESC=$(esc "$STATUS")
+
+          # Timestamp: usa el del commit si existe; si no, ahora
+          if [ -n "${{ github.event.head_commit.timestamp }}" ]; then
+            TS=$(date -u -d '${{ github.event.head_commit.timestamp }}' +%s%N)
+          else
+            TS=$(date -u +%s%N)
+          fi
+
           LINE="github_deploys,user=${USER},repo=${REPO},branch=${BRANCH},status=${STATUS_ESC} value=1 ${TS}"
-          
+          echo "Line protocol → $LINE"
+
           curl -sfS -X POST "$INFLUX_URL/api/v2/write?org=$INFLUX_ORG&bucket=$INFLUX_BUCKET" \
             -H "Authorization: Token $INFLUX_TOKEN" \
             -H "Content-Type: text/plain; charset=utf-8" \
-            -d "$LINE"
+            --data-binary "$LINE" || echo "⚠️ No se pudo enviar la métrica"
