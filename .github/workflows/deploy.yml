@@ -65,33 +65,32 @@ jobs:
           kubectl -n $NAMESPACE describe pods || true
           kubectl -n $NAMESPACE get events --sort-by='.lastTimestamp' | tail -150 || true
 
-######################## GitHub Metrics #################################
-
-      - name: 📈 Registrar push en InfluxDB
+      # GitHub Metrics
+      - name: 📊 Reportar estado del deploy
         if: always()
         env:
           INFLUX_URL: ${{ secrets.INFLUX_URL }}
           INFLUX_ORG: ${{ secrets.INFLUX_ORG }}
           INFLUX_BUCKET: ${{ secrets.INFLUX_BUCKET }}
           INFLUX_TOKEN: ${{ secrets.INFLUX_TOKEN }}
-          GH_REPO: ${{ github.repository }}
-          GH_BRANCH: ${{ github.ref_name }}
-          GH_USER: ${{ github.actor }}
-          GH_TS: ${{ github.event.head_commit.timestamp }}
+          STATUS: ${{ failure() && 'failure' || cancelled() && 'cancelled' || 'success' }}
         run: |
-          set -euo pipefail
-          esc() { sed -E 's/([ ,=])/\\\1/g'; }
-          user=$(printf '%s' "$GH_USER" | esc)
-          repo=$(printf '%s' "$GH_REPO" | esc)
-          branch=$(printf '%s' "$GH_BRANCH" | esc)
-          if [ -n "${GH_TS:-}" ]; then
-            ts=$(date -u -d "$GH_TS" +%s%N)
-          else
-            ts=$(date -u +%s%N)
-          fi
-          line="github_pushes,user=${user},repo=${repo},branch=${branch} value=1 ${ts}"
-          echo "Line protocol → $line"
+          # Escapar caracteres especiales para InfluxDB
+          escape() { echo "$1" | sed 's/[ ,=]/\\&/g'; }
+          
+          USER=$(escape "${{ github.actor }}")
+          REPO=$(escape "${{ github.repository }}")
+          BRANCH=$(escape "${{ github.ref_name }}")
+          STATUS_ESC=$(escape "$STATUS")
+          
+          # Usar timestamp del commit o actual
+          TIMESTAMP=${{ github.event.head_commit.timestamp && 'date -u -d "${{ github.event.head_commit.timestamp }}" +%s%N' || 'date -u +%s%N' }}
+          TS=$(eval $TIMESTAMP)
+          
+          # Enviar métrica a InfluxDB
+          LINE="github_deploys,user=${USER},repo=${REPO},branch=${BRANCH},status=${STATUS_ESC} value=1 ${TS}"
+          
           curl -sfS -X POST "$INFLUX_URL/api/v2/write?org=$INFLUX_ORG&bucket=$INFLUX_BUCKET" \
             -H "Authorization: Token $INFLUX_TOKEN" \
             -H "Content-Type: text/plain; charset=utf-8" \
-            --data-binary "$line"
+            -d "$LINE"
