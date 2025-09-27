@@ -10,23 +10,23 @@ jobs:
     env:
       DOCKERHUB_REPO: lgeronimom/tallermgf
       NAMESPACE: tallermgf
-    
+
     steps:
       - name: 📥 Checkout
         uses: actions/checkout@v4
-      
+
       - name: 🔍 Herramientas
         run: |
           kubectl version --client=true
           kubectl cluster-info
-      
+
       - name: 🔐 Login Docker Hub
         env:
           DH_USER: ${{ secrets.DOCKERHUB_USERNAME }}
           DH_PASS: ${{ secrets.DOCKERHUB_TOKEN }}
         run: |
           echo "$DH_PASS" | docker login -u "$DH_USER" --password-stdin
-      
+
       - name: 🏗️ Build & Push (tags SHA y latest)
         env:
           IMAGE_SHA: ${{ env.DOCKERHUB_REPO }}:${{ github.sha }}
@@ -37,7 +37,7 @@ jobs:
           docker push "$IMAGE_SHA"
           docker push "$IMAGE_LATEST"
           echo "IMAGE_SHA=$IMAGE_SHA" >> $GITHUB_ENV
-      
+
       - name: 🚀 Apply manifests
         run: |
           kubectl apply -f k8s/namespace.yaml
@@ -45,19 +45,19 @@ jobs:
           kubectl apply -f k8s/deployment.yaml
           kubectl apply -f k8s/service.yaml
           kubectl apply -f k8s/ingress.yaml
-      
+
       - name: 🔄 Actualizar imagen a la del commit (SHA)
         run: |
           kubectl -n $NAMESPACE set image deployment/tallermgf tallermgf=${IMAGE_SHA} --record
-      
+
       - name: ⏳ Esperar rollout
         run: kubectl -n $NAMESPACE rollout status deploy/tallermgf --timeout=300s
-      
+
       - name: ✅ Verificación
         run: |
           kubectl -n $NAMESPACE get deploy,pods,svc,ingress -o wide
           kubectl -n $NAMESPACE get events --sort-by=.lastTimestamp | tail -50
-      
+
       - name: 🧰 Diagnóstico si falla
         if: failure()
         run: |
@@ -68,33 +68,40 @@ jobs:
       # GitHub Metrics
       - name: 📊 Reportar estado del deploy
         if: always()
+        shell: bash
         env:
           INFLUX_URL: ${{ secrets.INFLUX_URL }}
           INFLUX_ORG: ${{ secrets.INFLUX_ORG }}
           INFLUX_BUCKET: ${{ secrets.INFLUX_BUCKET }}
           INFLUX_TOKEN: ${{ secrets.INFLUX_TOKEN }}
-          STATUS: ${{ job.status }}              # success | failure | cancelled
+
+          GH_ACTOR: ${{ github.actor }}
+          GH_REPOSITORY: ${{ github.repository }}
+          GH_REF_NAME: ${{ github.ref_name }}
+          GH_TS: ${{ github.event.head_commit.timestamp }}
+          STATUS: ${{ job.status }} # success | failure | cancelled
         run: |
           set -euo pipefail
-          # Escapar tags para line protocol (espacio, coma, '=')
           esc() { sed -E 's/([ ,=])/\\\1/g'; }
 
-          USER=$(esc "${{ github.actor }}")
-          REPO=$(esc "${{ github.repository }}")
-          BRANCH=$(esc "${{ github.ref_name }}")
-          STATUS_ESC=$(esc "$STATUS")
+          user=$(printf '%s' "${GH_ACTOR:-unknown}" | esc)
+          repo=$(printf '%s' "${GH_REPOSITORY:-unknown}" | esc)
+          branch=$(printf '%s' "${GH_REF_NAME:-unknown}" | esc)
+          status=$(printf '%s' "${STATUS:-unknown}" | esc)
 
-          # Timestamp: usa el del commit si existe; si no, ahora
-          if [ -n "${{ github.event.head_commit.timestamp }}" ]; then
-            TS=$(date -u -d '${{ github.event.head_commit.timestamp }}' +%s%N)
+          # Timestamp en ns: usa el del commit si existe; si no, ahora
+          if [ -n "${GH_TS:-}" ]; then
+            TS=$(date -u -d "$GH_TS" +%s%N || date -u +%s%N)
           else
             TS=$(date -u +%s%N)
           fi
 
-          LINE="github_deploys,user=${USER},repo=${REPO},branch=${BRANCH},status=${STATUS_ESC} value=1 ${TS}"
+          LINE="github_deploys,user=${user},repo=${repo},branch=${branch},status=${status} value=1 ${TS}"
           echo "Line protocol → $LINE"
 
-          curl -sfS -X POST "$INFLUX_URL/api/v2/write?org=$INFLUX_ORG&bucket=$INFLUX_BUCKET" \
+          curl -sfS -i -X POST "$INFLUX_URL/api/v2/write?org=$INFLUX_ORG&bucket=$INFLUX_BUCKET&precision=ns" \
             -H "Authorization: Token $INFLUX_TOKEN" \
             -H "Content-Type: text/plain; charset=utf-8" \
             --data-binary "$LINE" || echo "⚠️ No se pudo enviar la métrica"
+
+
