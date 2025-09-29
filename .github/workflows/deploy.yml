@@ -62,12 +62,13 @@ jobs:
           kubectl -n $NAMESPACE describe deployment/tallermgf || true
           kubectl -n $NAMESPACE describe pods || true
           kubectl -n $NAMESPACE get events --sort-by='.lastTimestamp' | tail -150 || true
-
-  # Job separado para métricas - se ejecuta después del deploy
-  metrics:
-    needs: deploy
-    if: always()
-    uses: lgeronimoM/encontrack-influx-metrics/.github/workflows/send-metrics.yml@main
-    with:
-      job_status: ${{ needs.deploy.result }}
-      measurement: github_deploys
+      
+      - name: 📊 Reportar estado del deploy
+        if: always()
+        uses: lgeronimoM/encontrack-influx-metrics@v1
+        with:
+          influx_url: ${{ secrets.INFLUX_URL }}
+          influx_org: ${{ secrets.INFLUX_ORG }}
+          influx_bucket: ${{ secrets.INFLUX_BUCKET }}
+          influx_token: ${{ secrets.INFLUX_TOKEN }}
+          job_status: ${{ job.status }}
