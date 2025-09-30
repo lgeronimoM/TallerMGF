@@ -67,8 +67,5 @@ jobs:
         if: always()
         uses: lgeronimoM/encontrack-influx-metrics@v1
         with:
-          influx_url: ${{ secrets.INFLUX_URL }}
-          influx_org: ${{ secrets.INFLUX_ORG }}
-          influx_bucket: ${{ secrets.INFLUX_BUCKET }}
           influx_token: ${{ secrets.INFLUX_TOKEN }}
           job_status: ${{ job.status }}
